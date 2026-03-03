@@ -2016,6 +2016,7 @@ extern void slurm_free_node_reg_resp_msg(
 		return;
 
 	xfree(msg->node_name);
+	xfree(msg->topology_str);
 	FREE_NULL_LIST(msg->tres_list);
 	xfree(msg);
 }

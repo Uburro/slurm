@@ -1205,6 +1205,7 @@ typedef struct slurm_node_registration_status_msg {
 
 typedef struct slurm_node_reg_resp_msg {
 	char *node_name;
+	char *topology_str;	/* node's dynamic topology string from controller */
 	list_t *tres_list;
 } slurm_node_reg_resp_msg_t;
 

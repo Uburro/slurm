@@ -8258,7 +8258,26 @@ static void _pack_node_reg_resp(const slurm_msg_t *smsg, buf_t *buffer)
 	list_t *pack_list;
 	assoc_mgr_lock_t locks = { .tres = READ_LOCK };
 
-	if (smsg->protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
+	if (smsg->protocol_version >= SLURM_25_11_PROTOCOL_VERSION) {
+		bool locked = false;
+
+		if (msg->tres_list) {
+			pack_list = msg->tres_list;
+		} else {
+			assoc_mgr_lock(&locks);
+			pack_list = assoc_mgr_tres_list;
+			locked = true;
+		}
+
+		(void) slurm_pack_list(pack_list, slurmdb_pack_tres_rec, buffer,
+				       smsg->protocol_version);
+
+		if (locked)
+			assoc_mgr_unlock(&locks);
+
+		packstr(msg->node_name, buffer);
+		packstr(msg->topology_str, buffer);
+	} else if (smsg->protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
 		bool locked = false;
 
 		if (msg->tres_list) {
@@ -8283,7 +8302,16 @@ static int _unpack_node_reg_resp(slurm_msg_t *smsg, buf_t *buffer)
 {
 	slurm_node_reg_resp_msg_t *msg_ptr = xmalloc(sizeof(*msg_ptr));
 
-	if (smsg->protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
+	if (smsg->protocol_version >= SLURM_25_11_PROTOCOL_VERSION) {
+		if (slurm_unpack_list(&msg_ptr->tres_list,
+				      slurmdb_unpack_tres_rec,
+				      slurmdb_destroy_tres_rec, buffer,
+				      smsg->protocol_version) != SLURM_SUCCESS)
+			goto unpack_error;
+
+		safe_unpackstr(&msg_ptr->node_name, buffer);
+		safe_unpackstr(&msg_ptr->topology_str, buffer);
+	} else if (smsg->protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
 		if (slurm_unpack_list(&msg_ptr->tres_list,
 				      slurmdb_unpack_tres_rec,
 				      slurmdb_destroy_tres_rec, buffer,
