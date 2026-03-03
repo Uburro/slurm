@@ -855,6 +855,29 @@ static void _handle_node_reg_resp(slurm_msg_t *resp_msg)
 			xfree(conf->node_name);
 			conf->node_name = xstrdup(resp->node_name);
 		}
+
+		/*
+		 * For cloud nodes, the controller sends back the node's
+		 * dynamic topology string so slurmd can update its local
+		 * topology state instead of relying on the static
+		 * SLURM_CONF topology files.
+		 */
+		if (resp->topology_str) {
+			node_record_t *node_ptr =
+				find_node_record(conf->node_name);
+			if (node_ptr) {
+				xfree(node_ptr->topology_str);
+				node_ptr->topology_str =
+					xstrdup(resp->topology_str);
+				if (topology_g_add_rm_node(node_ptr))
+					error("%s: failed to update topology for %s",
+					      __func__, conf->node_name);
+				else {
+					_set_topo_info();
+					build_conf_buf();
+				}
+			}
+		}
 	}
 }
 

@@ -2671,6 +2671,7 @@ static void _slurm_rpc_node_registration(slurm_msg_t *msg)
 	int error_code = SLURM_SUCCESS;
 	bool newly_up = false;
 	bool already_registered = false;
+	char *node_topology_str = NULL;
 	slurm_node_registration_status_msg_t *node_reg_stat_msg = msg->data;
 	slurmctld_lock_t job_write_lock = {
 		.conf = READ_LOCK,
@@ -2759,6 +2760,17 @@ static void _slurm_rpc_node_registration(slurm_msg_t *msg)
 		validate_jobs_on_node(msg);
 		error_code = validate_node_specs(msg, &newly_up);
 
+		/*
+		 * Capture dynamic topology for cloud nodes while still holding
+		 * the write lock so slurmd can update its local topology state.
+		 */
+		if (!error_code) {
+			node_record_t *n = find_node_record(
+				node_reg_stat_msg->node_name);
+			if (n && IS_NODE_CLOUD(n))
+				node_topology_str = xstrdup(n->topology_str);
+		}
+
 		if (!(msg->flags & CTLD_QUEUE_PROCESSING))
 			unlock_slurmctld(job_write_lock);
 		END_TIMER2(__func__);
@@ -2800,6 +2812,8 @@ send_resp:
 				tmp_resp.node_name =
 					node_reg_stat_msg->node_name;
 
+			tmp_resp.topology_str = node_topology_str;
+
 			(void) send_msg_response(msg,
 						 RESPONSE_NODE_REGISTRATION,
 						 &tmp_resp);
@@ -2818,6 +2832,7 @@ send_resp:
 			}
 		}
 	}
+	xfree(node_topology_str);
 }
 
 /* _slurm_rpc_job_alloc_info - process RPC to get details on existing job */
